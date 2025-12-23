@@ -1,0 +1,135 @@
+# Command Registry for Linux Voice AI Assistant
+
+# Intent Keywords
+intents:
+  open_app:
+    keywords:
+      - "open"
+      - "launch"
+      - "start"
+      - "run"
+    
+  close_app:
+    keywords:
+      - "close"
+      - "quit"
+      - "stop"
+      - "kill"
+      - "exit"
+    
+  system_info:
+    keywords:
+      - "cpu"
+      - "processor"
+      - "ram"
+      - "memory"
+      - "disk"
+      - "storage"
+      - "space"
+      - "usage"
+  
+  time_date:
+    keywords:
+      - "time"
+      - "date"
+      - "clock"
+      - "today"
+  
+  volume:
+    keywords:
+      - "volume"
+      - "sound"
+      - "loud"
+      - "quiet"
+  
+  power:
+    keywords:
+      - "shutdown"
+      - "restart"
+      - "reboot"
+      - "lock"
+  
+  web_search:
+    keywords:
+      - "search"
+      - "google"
+      - "look up"
+      - "find"
+
+# Application Mappings
+applications:
+  firefox:
+    executables:
+      - "firefox"
+      - "firefox-esr"
+    synonyms:
+      - "firefox"
+      - "browser"
+      - "web browser"
+      - "mozilla"
+      
+  chrome:
+    executables:
+      - "google-chrome"
+      - "chromium"
+      - "chromium-browser"
+    synonyms:
+      - "chrome"
+      - "chromium"
+      - "google chrome"
+      
+  terminal:
+    executables:
+      - "gnome-terminal"
+      - "konsole"
+      - "alacritty"
+      - "kitty"
+      - "xterm"
+    synonyms:
+      - "terminal"
+      - "console"
+      - "command line"
+      
+  vscode:
+    executables:
+      - "code"
+      - "code-oss"
+    synonyms:
+      - "vs code"
+      - "visual studio code"
+      - "vscode"
+      - "editor"
+      
+  files:
+    executables:
+      - "nautilus"
+      - "dolphin"
+      - "thunar"
+      - "nemo"
+    synonyms:
+      - "files"
+      - "file manager"
+      - "explorer"
+
+# Response Templates
+responses:
+  success:
+    open_app: "{app} is now open."
+    close_app: "{app} has been closed."
+    search: "Searching for {query}."
+    volume: "Volume set to {level} percent."
+    power: "{action} initiated."
+    
+  error:
+    app_not_found: "I couldn't find {app}. Please make sure it's installed."
+    already_running: "{app} is already running."
+    not_running: "{app} is not currently running."
+    unknown_command: "I didn't understand that command. Try saying 'open firefox' or 'what's my CPU usage'."
+    transcription_failed: "I couldn't hear you clearly. Please try again."
+    
+  system_info:
+    cpu: "CPU usage is {value} percent."
+    ram: "You have {total} gigabytes of RAM, with {available} gigabytes available."
+    disk: "Your main disk is {percent} percent full. {used} of {total} gigabytes used."
+    time: "The time is {time}."
+    date: "Today is {date}."

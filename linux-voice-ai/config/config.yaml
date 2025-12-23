@@ -1,0 +1,51 @@
+# Linux Voice AI Assistant Configuration
+
+# Audio Settings
+audio:
+  sample_rate: 16000
+  channels: 1
+  chunk_size: 1024
+  max_recording_seconds: 10
+  
+# Speech-to-Text (Whisper)
+stt:
+  model_name: "base"  # Changed from 'tiny' for better accuracy
+  device: "cpu"
+  compute_type: "int8"
+  language: "en"
+  
+# Text-to-Speech (Piper)
+tts:
+  model_name: "en_US-lessac-medium"
+  speaker: 0
+  length_scale: 1.0
+  noise_scale: 0.667
+  noise_w: 0.8
+
+# LLM Configuration (Ollama)
+llm:
+  enabled: true
+  provider: "ollama"
+  base_url: "http://localhost:11434"  # Works with Docker host networking
+  model: "functiongemma:270m"
+  temperature: 0.7
+  max_tokens: 512
+  timeout: 30
+  fallback_to_rules: true
+  
+# Hotkey Configuration
+hotkey:
+  combination: "<ctrl>+<space>"
+  
+# Logging
+logging:
+  level: "INFO"
+  file: "logs/lva.log"
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
+  
+# Paths
+paths:
+  temp_audio: "temp"
+  models: "models"
+  logs: "logs"

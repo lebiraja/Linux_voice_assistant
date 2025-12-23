@@ -1,0 +1,24 @@
+# Core dependencies
+faster-whisper>=0.10.0
+sounddevice>=0.4.6
+pynput>=1.7.6
+psutil>=5.9.0
+PyYAML>=6.0
+numpy>=1.24.0
+
+# TTS - Google TTS (no model downloads needed!)
+gTTS>=2.3.0
+
+# Fuzzy matching for app names
+rapidfuzz>=3.0.0
+
+# Audio processing
+scipy>=1.10.0
+soundfile>=0.12.0
+
+# Utilities
+python-dotenv>=1.0.0
+colorama>=0.4.6
+
+# LLM Integration
+requests>=2.31.0
