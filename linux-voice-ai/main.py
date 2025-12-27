@@ -20,6 +20,12 @@ from tts.google_tts import GoogleTTS
 from utils import setup_logging, generate_response, get_error_response
 from ui import SiriUI
 from llm import OllamaClient, SmartRouter, SystemPrompts
+from tools import ToolRegistry, ToolExecutor
+from tools.builtin import (
+    ListFilesTool, ReadFileTool, SearchFilesTool,
+    GetSystemInfoTool, GetProcessesTool, ExecuteCommandTool,
+    SearchWebTool, FetchURLTool
+)
 
 logger = logging.getLogger(__name__)
 
@@ -129,12 +135,45 @@ class VoiceAssistant:
         self.app_controller = AppController(self.parser)
         self.system_info = SystemInfo(self.parser)
         
+        # Tools
+        self.tool_registry = ToolRegistry()
+        self.tool_executor = None
+        
+        # Register built-in tools
+        self._register_tools()
+        
+        # Initialize tool executor
+        if self.llm_client:
+            self.tool_executor = ToolExecutor(self.tool_registry)
+            logger.info(f"Tool executor initialized with {len(self.tool_registry)} tools")
+        
         # TTS
         tts_config = self.config.get('tts', {})
         self.tts = GoogleTTS(
             lang=tts_config.get('lang', 'en'),
             tld=tts_config.get('tld', 'com')
         )
+    
+    def _register_tools(self):
+        """Register all built-in tools"""
+        tools = [
+            # Filesystem tools
+            ListFilesTool(),
+            ReadFileTool(),
+            SearchFilesTool(),
+            # System tools
+            GetSystemInfoTool(),
+            GetProcessesTool(),
+            ExecuteCommandTool(),
+            # Web tools
+            SearchWebTool(),
+            FetchURLTool()
+        ]
+        
+        for tool in tools:
+            self.tool_registry.register(tool)
+        
+        logger.info(f"Registered {len(tools)} built-in tools")
     
     def process_voice_command(self):
         """Process a voice command (full pipeline)."""
@@ -203,7 +242,7 @@ class VoiceAssistant:
     
     def _process_with_llm(self, text, context=None):
         """
-        Process command using LLM.
+        Process command using LLM with text-based tool calling.
         
         Args:
             text: User command
@@ -213,10 +252,14 @@ class VoiceAssistant:
             str: Response text
         """
         try:
-            # Get system prompt
-            system_prompt = SystemPrompts.get_system_prompt()
+            # Get system prompt with tools
+            tool_schemas = self.tool_registry.get_all_schemas() if self.tool_executor else []
+            system_prompt = SystemPrompts.get_system_prompt(
+                include_tools=len(tool_schemas) > 0,
+                tools=tool_schemas
+            )
             
-            # Generate response
+            # First LLM call - ask if it needs tools
             result = self.llm_client.generate(
                 prompt=text,
                 system=system_prompt,
@@ -224,9 +267,7 @@ class VoiceAssistant:
                 max_tokens=self.config.get('llm', {}).get('max_tokens', 512)
             )
             
-            if result.get('success'):
-                return result.get('response', 'I processed your request.')
-            else:
+            if not result.get('success'):
                 logger.error(f"LLM error: {result.get('message')}")
                 # Fallback to rule-based
                 intent = self.parser.parse(text)
@@ -234,10 +275,101 @@ class VoiceAssistant:
                     exec_result = self._execute_action(intent)
                     return generate_response(exec_result, self.parser)
                 return "I'm having trouble understanding that. Could you rephrase?"
+            
+            response = result.get('response', '')
+            
+            # Check if LLM wants to use a tool (text-based format)
+            if 'TOOL:' in response and self.tool_executor:
+                logger.info("LLM requested tool usage (text-based)")
+                
+                # Parse tool call from response
+                tool_call = self._parse_tool_call(response)
+                
+                if tool_call:
+                    tool_name = tool_call['name']
+                    tool_params = tool_call['params']
+                    
+                    logger.info(f"Executing tool: {tool_name} with params: {tool_params}")
+                    
+                    # Execute the tool
+                    tool_result = self.tool_executor.execute(tool_name, tool_params)
+                    
+                    # Format result
+                    result_text = self.tool_executor.format_result_for_llm(tool_result)
+                    
+                    # Get final response from LLM with tool results
+                    final_prompt = f"""Tool '{tool_name}' returned:
+{result_text}
+
+Based on these results, provide a concise spoken answer to: {text}
+
+Keep it brief (1-2 sentences) since it will be spoken aloud."""
+                    
+                    final_result = self.llm_client.generate(
+                        prompt=final_prompt,
+                        system="You are JARVIS. Provide a concise, natural response based on the tool results.",
+                        temperature=0.7,
+                        max_tokens=150
+                    )
+                    
+                    if final_result.get('success'):
+                        return final_result.get('response', 'I processed your request.')
+            
+            # No tools needed or tool execution failed, return direct response
+            return response
                 
         except Exception as e:
-            logger.error(f"LLM processing failed: {e}")
+            logger.error(f"LLM processing failed: {e}", exc_info=True)
             return "I encountered an error. Please try again."
+    
+    def _parse_tool_call(self, response: str) -> dict:
+        """
+        Parse tool call from LLM text response.
+        
+        Expected format: TOOL: tool_name(param1="value1", param2="value2")
+        
+        Args:
+            response: LLM response text
+            
+        Returns:
+            dict: {'name': tool_name, 'params': {param: value}} or None
+        """
+        import re
+        
+        try:
+            # Find TOOL: pattern
+            match = re.search(r'TOOL:\s*([\w_]+)\(([^)]*)\)', response)
+            
+            if not match:
+                return None
+            
+            tool_name = match.group(1)
+            params_str = match.group(2)
+            
+            # Parse parameters
+            params = {}
+            if params_str.strip():
+                # Simple parameter parsing
+                param_matches = re.findall(r'(\w+)\s*=\s*"([^"]*)"|([\w_]+)\s*=\s*([\w.]+)', params_str)
+                for match in param_matches:
+                    if match[0]:  # String value
+                        params[match[0]] = match[1]
+                    elif match[2]:  # Non-string value
+                        value = match[3]
+                        # Try to convert to appropriate type
+                        if value.isdigit():
+                            params[match[2]] = int(value)
+                        elif value.lower() in ['true', 'false']:
+                            params[match[2]] = value.lower() == 'true'
+                        else:
+                            params[match[2]] = value
+            
+            logger.info(f"Parsed tool call: {tool_name} with params: {params}")
+            return {'name': tool_name, 'params': params}
+            
+        except Exception as e:
+            logger.error(f"Failed to parse tool call: {e}")
+            return None
     
     def _execute_action(self, intent):
         """
