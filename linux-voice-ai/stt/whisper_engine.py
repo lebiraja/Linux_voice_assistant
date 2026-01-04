@@ -67,7 +67,11 @@ class WhisperEngine:
                 language=self.language,
                 beam_size=5,
                 vad_filter=True,  # Voice activity detection
-                vad_parameters=dict(min_silence_duration_ms=500)
+                vad_parameters=dict(
+                    min_silence_duration_ms=1000,
+                    speech_pad_ms=400,
+                    threshold=0.5
+                )
             )
             
             # Combine all segments

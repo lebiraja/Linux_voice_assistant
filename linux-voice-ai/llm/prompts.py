@@ -101,7 +101,10 @@ TOOL: tool_name(param1="value1", param2="value2")
 
 **Important:** 
 - ALWAYS use tools to complete actions
+- You can use MULTIPLE tools in sequence if needed
 - Respond ONLY with: TOOL: tool_name(params)
+- **DO NOT** invent actions. Only do EXACTLY what the user asks.
+- If the user asks to "Open Terminal", do NOT open other apps.
 """
     
     @staticmethod

@@ -27,9 +27,9 @@ llm:
   enabled: true
   provider: "ollama"
   base_url: "http://localhost:11434"  # Works with Docker host networking
-  model: "functiongemma:270m"
-  temperature: 0.7
-  max_tokens: 512
+  model: "deepseek-r1:1.5b"
+  temperature: 0.6    # Slightly higher for reasoning
+  max_tokens: 1024    # Increased for Chain of Thought output
   timeout: 30
   fallback_to_rules: true
   

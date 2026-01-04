@@ -72,8 +72,13 @@ class SmartRouter:
             
             # If rule parser succeeded, use it
             if result and result.get('intent') != 'unknown':
-                self.logger.info(f"Using rule-based parser: {result['intent']}")
-                return ('rules', result)
+                # CHECK: If intent is found but target is missing for app commands, fallback to LLM
+                # This handles "Open Brave" where "Brave" isn't in commands.yaml
+                if result.get('intent') in ['open_app', 'close_app'] and not result.get('target'):
+                    self.logger.info(f"Rule parser found intent {result['intent']} but no target. Fallback to LLM.")
+                else:
+                    self.logger.info(f"Using rule-based parser: {result['intent']}")
+                    return ('rules', result)
         
         # Step 2: Try LLM if enabled
         if self.llm_enabled:

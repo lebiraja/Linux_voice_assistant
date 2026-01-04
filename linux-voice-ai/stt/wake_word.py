@@ -127,6 +127,7 @@ class WakeWordDetector:
         
         self._callback = callback
         self.is_listening = True
+        self.paused = False
         
         # Start listening thread
         self._listen_thread = threading.Thread(
@@ -138,6 +139,24 @@ class WakeWordDetector:
         
         logger.info(f"Started listening for wake word: '{self.model_name}'")
         return True
+        
+    def pause(self):
+        """Pause wake word detection (e.g., while speaking)."""
+        self.paused = True
+        logger.debug("Wake word detection paused")
+        
+    def resume(self):
+        """Resume wake word detection."""
+        # Clear queue to avoid processing stale audio
+        with self._audio_queue.mutex:
+            self._audio_queue.queue.clear()
+        
+        # Reset model state
+        if self.model:
+            self.model.reset()
+            
+        self.paused = False
+        logger.debug("Wake word detection resumed")
     
     def stop_listening(self):
         """Stop wake word listening."""
@@ -167,8 +186,8 @@ class WakeWordDetector:
                         # Get audio chunk from queue
                         audio_chunk = self._audio_queue.get(timeout=0.5)
                         
-                        # Check for wake word
-                        if self.detect(audio_chunk):
+                        # Check for wake word if not paused
+                        if not self.paused and self.detect(audio_chunk):
                             if self._callback:
                                 logger.info("Wake word detected! Triggering callback...")
                                 # Reset model to avoid multiple triggers
@@ -248,3 +267,13 @@ class WakeWordManager:
             return False
         else:
             return self.start()
+            
+    def pause(self):
+        """Pause detection."""
+        if self.detector:
+            self.detector.pause()
+            
+    def resume(self):
+        """Resume detection."""
+        if self.detector:
+            self.detector.resume()

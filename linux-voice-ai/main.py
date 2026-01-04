@@ -234,6 +234,13 @@ class VoiceAssistant:
         
         print(f"📝 You said: \"{text}\"")
         
+        # Filter garbage transcriptions (short text or just numbers)
+        clean_text = text.strip().replace('.', '').replace(',', '')
+        if len(clean_text) < 2 or (clean_text.replace(' ', '').isdigit() and len(clean_text) < 5):
+            logger.warning(f"Ignored garbage transcription: '{text}'")
+            print("🚫 Ignored (noise/hallucination)")
+            return
+        
         # 3. Route command (rules vs LLM)
         if self.router:
             processor_type, data = self.router.route(text)
@@ -308,52 +315,71 @@ class VoiceAssistant:
             
             response = result.get('response', '')
             
-            # Check if LLM wants to use a tool (text-based format)
+            # Check if LLM wants to use tools (text-based format)
             if 'TOOL:' in response and self.tool_executor:
                 logger.info("LLM requested tool usage (text-based)")
                 
-                # Parse tool call from response
-                tool_call = self._parse_tool_call(response)
+                # Parse tool calls from response (returns list)
+                tool_calls = self._parse_tool_calls(response)
                 
-                if tool_call:
-                    tool_name = tool_call['name']
-                    tool_params = tool_call['params']
+                if tool_calls:
+                    full_result_text = []
                     
-                    logger.info(f"Executing tool: {tool_name} with params: {tool_params}")
+                    # Execute all parsed tools sequentially
+                    for call in tool_calls:
+                        tool_name = call['name']
+                        tool_params = call['params']
+                        
+                        logger.info(f"Executing tool: {tool_name} with params: {tool_params}")
+                        
+                        # Execute the tool
+                        tool_result = self.tool_executor.execute(tool_name, tool_params)
+                        
+                        # Format result clearly
+                        result_str = self.tool_executor.format_result_for_llm(tool_result)
+                        full_result_text.append(f"Tool '{tool_name}' output:\n{result_str}")
                     
-                    # Execute the tool
-                    tool_result = self.tool_executor.execute(tool_name, tool_params)
-                    
-                    # Format result clearly
-                    result_text = self.tool_executor.format_result_for_llm(tool_result)
-                    
-                    logger.debug(f"Tool result formatted: {result_text}")
+                    combined_results = "\n\n".join(full_result_text)
+                    logger.debug(f"Combined tool results: {combined_results}")
                     
                     # Get final response from LLM with tool results
                     final_prompt = f"""I asked: "{text}"
 
-The {tool_name} tool returned this data:
-{result_text}
+Here are the results from the tools you requested:
+{combined_results}
 
-Answer my question using the data above. Be specific with numbers.
+Answer my question / confirm completion using the data above.
 Keep it brief (1-2 sentences) since it will be spoken aloud."""
                     
                     final_result = self.llm_client.generate(
                         prompt=final_prompt,
-                        system="You are JARVIS. Answer using the data provided. Use specific numbers.",
-                        temperature=0.3,  # Lower for accuracy
-                        max_tokens=100
+                        system="You are JARVIS. Confirm actions or answer using the provided data.",
+                        temperature=0.3,
+                        max_tokens=150
                     )
                     
                     if final_result.get('success'):
                         final_response = final_result.get('response', '')
+                        
+                        # Clean final response of any <think> blocks
+                        import re
+                        final_response = re.sub(r'<think>.*?</think>', '', final_response, flags=re.DOTALL).strip()
+                        
+                        # If empty after cleaning, use fallback
+                        if not final_response:
+                            # Generate dynamic summary of actions
+                            action_summary = self._generate_action_summary(tool_calls)
+                            return action_summary
+                            
                         # If LLM still refuses, provide direct answer from data
                         if any(word in final_response.lower() for word in ['cannot', 'unable', 'sorry', "don't have"]):
-                            return self._generate_direct_answer(tool_name, tool_result, text)
+                            # Fallback: just return the last tool's success message roughly
+                            return "I completed the requested actions."
+                            
                         return final_response
                     else:
-                        # LLM failed, generate direct answer
-                        return self._generate_direct_answer(tool_name, tool_result, text)
+                        # LLM failed, return generic success
+                        return "Actions completed successfully."
             
             # No tools needed or tool execution failed, return direct response
             return response
@@ -361,9 +387,42 @@ Keep it brief (1-2 sentences) since it will be spoken aloud."""
         except Exception as e:
             logger.error(f"LLM processing failed: {e}", exc_info=True)
             return "I encountered an error. Please try again."
+            
+    def _generate_action_summary(self, tool_calls: list) -> str:
+        """Generate a natural language summary of executed actions."""
+        if not tool_calls:
+            return "I completed the task."
+            
+        actions = []
+        for call in tool_calls:
+            name = call['name']
+            params = call['params']
+            
+            if name == 'open_app':
+                app = params.get('app_name', 'application')
+                actions.append(f"opened {app}")
+            elif name == 'close_app':
+                app = params.get('app_name', 'application')
+                actions.append(f"closed {app}")
+            elif name == 'run_script':
+                actions.append("ran a script")
+            elif name == 'list_files':
+                actions.append("listed files")
+            elif name == 'get_system_info':
+                actions.append("checked system info")
+            else:
+                actions.append(f"used {name}")
+        
+        if len(actions) == 1:
+            return f"I have {actions[0]}."
+        elif len(actions) == 2:
+            return f"I have {actions[0]} and {actions[1]}."
+        else:
+            # Join with commas and 'and'
+            return f"I have {', '.join(actions[:-1])}, and {actions[-1]}."
     
-    def _parse_tool_call(self, response: str) -> dict:
-        """Parse tool call from LLM text response."""
+    def _parse_tool_calls(self, response: str) -> list:
+        """Parse multiple tool calls from LLM text response."""
         import re
         
         VALID_TOOLS = {
@@ -373,33 +432,39 @@ Keep it brief (1-2 sentences) since it will be spoken aloud."""
             'search_web', 'fetch_url'
         }
         
+        tool_calls = []
+        
         try:
-            match = re.search(r'TOOL:\s*([\w_]+)\(([^)]*)\)', response)
-            if not match:
-                return None
+            # Clean response: remove <think>...</think> blocks from reasoning models
+            cleaned_response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
             
-            tool_name = match.group(1)
-            params_str = match.group(2)
-            
-            # Validate tool name
-            if tool_name not in VALID_TOOLS:
-                logger.warning(f"Invalid tool: {tool_name}")
-                return None
-            
-            # Parse parameters  
-            params = {}
-            if params_str.strip():
-                for m in re.findall(r'(\w+)\s*=\s*"([^"]*)"', params_str):
-                    params[m[0]] = m[1]
-                for m in re.findall(r"(\w+)\s*=\s*'([^']*)'", params_str):
-                    params[m[0]] = m[1]
-            
-            logger.info(f"Parsed: {tool_name} params: {params}")
-            return {'name': tool_name, 'params': params}
+            # Find all TOOL: patterns
+            # Regex captures: 1=tool_name, 2=params_str
+            for match in re.finditer(r'TOOL:\s*([\w_]+)\(([^)]*)\)', cleaned_response):
+                tool_name = match.group(1)
+                params_str = match.group(2)
+                
+                # Validate tool name
+                if tool_name not in VALID_TOOLS:
+                    logger.warning(f"Invalid tool skipped: {tool_name}")
+                    continue
+                
+                # Parse parameters  
+                params = {}
+                if params_str.strip():
+                    for m in re.findall(r'(\w+)\s*=\s*"([^"]*)"', params_str):
+                        params[m[0]] = m[1]
+                    for m in re.findall(r"(\w+)\s*=\s*'([^']*)'", params_str):
+                        params[m[0]] = m[1]
+                
+                logger.info(f"Parsed: {tool_name} params: {params}")
+                tool_calls.append({'name': tool_name, 'params': params})
+                
+            return tool_calls
             
         except Exception as e:
             logger.error(f"Parse error: {e}")
-            return None
+            return []
     
     def _generate_direct_answer(self, tool_name: str, tool_result: dict, question: str) -> str:
         """
@@ -492,7 +557,19 @@ Keep it brief (1-2 sentences) since it will be spoken aloud."""
         audio_file = self.tts.speak(text)
         
         if audio_file:
-            self.player.play_file(audio_file)
+            # Pause wake word detection during playback to avoid self-triggering
+            if self.wake_word_manager:
+                self.wake_word_manager.pause()
+            
+            try:
+                self.player.play_file(audio_file)
+            finally:
+                # Resume wake word detection after a short grace period
+                if self.wake_word_manager:
+                    # Small delay to let echoes die down
+                    import time
+                    time.sleep(0.3)
+                    self.wake_word_manager.resume()
         else:
             logger.error("TTS synthesis failed")
     
