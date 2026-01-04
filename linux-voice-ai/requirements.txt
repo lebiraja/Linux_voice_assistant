@@ -22,3 +22,7 @@ colorama>=0.4.6
 
 # LLM Integration
 requests>=2.31.0
+
+# Wake Word Detection (using ONNX backend for Python 3.12 compatibility)
+onnxruntime>=1.15.0
+openwakeword>=0.6.0

@@ -66,48 +66,42 @@ Provide a helpful, conversational response explaining what went wrong and sugges
 You have access to these tools. To use a tool, respond with:
 TOOL: tool_name(param1="value1", param2="value2")
 
-**Available Tools:**
+**App Control Tools:**
+1. open_app(app_name="") - Open ANY application
+   - Example: TOOL: open_app(app_name="terminal")
+   - Example: TOOL: open_app(app_name="firefox")
+   - Works for: terminal, chrome, vscode, nautilus, spotify, etc.
 
-1. get_system_info(info_type="all") - Get CPU, RAM, disk usage
-   - info_type: "cpu", "memory", "disk", or "all"
-   - Example: TOOL: get_system_info(info_type="all")
+2. close_app(app_name="") - Close an application
+   - Example: TOOL: close_app(app_name="firefox")
 
-2. list_files(path=".", pattern="*") - List files in directory
-   - path: directory path
-   - pattern: file pattern like "*.py"
+3. run_script(script="") - Run shell commands/scripts
+   - Example: TOOL: run_script(script="mkdir new_folder")
+   - Example: TOOL: run_script(script="python3 script.py")
+
+**System Tools:**
+4. get_system_info(info_type="all") - Get CPU, RAM, disk usage
+   - Example: TOOL: get_system_info(info_type="cpu")
+
+5. get_processes(name_filter="") - List running processes
+   - Example: TOOL: get_processes(name_filter="chrome")
+
+6. list_files(path=".", pattern="*") - List files
    - Example: TOOL: list_files(path=".", pattern="*.py")
 
-3. get_processes(name_filter="", max_results=10) - List running processes
-   - name_filter: filter by process name
-   - Example: TOOL: get_processes(name_filter="firefox")
-
-4. search_web(query="", max_results=5) - Search the web
-   - query: search query
-   - Example: TOOL: search_web(query="Python tutorials")
-
-5. read_file(file_path="") - Read file contents
-   - file_path: path to file
-   - Example: TOOL: read_file(file_path="README.md")
-
-6. search_files(search_path=".", filename_pattern="*") - Find files by name
-   - Example: TOOL: search_files(search_path=".", filename_pattern="*.txt")
-
-7. execute_command(command="") - Run safe command (ls, cat, grep, etc.)
-   - Example: TOOL: execute_command(command="ls -la")
-
-8. fetch_url(url="") - Get web page content
-   - Example: TOOL: fetch_url(url="https://example.com")
+7. search_web(query="") - Search the web
+   - Example: TOOL: search_web(query="linux commands")
 
 **When to use tools:**
-- User asks about system/CPU/RAM → Use get_system_info
-- User wants file list → Use list_files
-- User wants to search web → Use search_web
-- User asks about processes → Use get_processes
+- "Open terminal/firefox/chrome" → Use open_app
+- "Close firefox" → Use close_app
+- "Create a folder" / "Run a script" → Use run_script
+- "CPU usage" / "system status" → Use get_system_info
+- "List files" → Use list_files
 
 **Important:** 
-- If you need a tool, respond ONLY with: TOOL: tool_name(params)
-- After getting tool results, I'll ask you to format the answer
-- For simple app control (open/close), don't use tools
+- ALWAYS use tools to complete actions
+- Respond ONLY with: TOOL: tool_name(params)
 """
     
     @staticmethod

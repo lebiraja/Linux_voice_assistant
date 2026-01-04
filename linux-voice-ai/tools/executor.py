@@ -113,10 +113,48 @@ class ToolExecutor:
         """
         if result.get('success'):
             tool_result = result.get('result', {})
-            if isinstance(tool_result, dict):
-                # Format dict results nicely
-                lines = [f"{k}: {v}" for k, v in tool_result.items()]
-                return "\n".join(lines)
-            return str(tool_result)
+            return self._format_value(tool_result)
         else:
             return f"Error: {result.get('error', 'Unknown error')}"
+    
+    def _format_value(self, value: Any, indent: int = 0) -> str:
+        """
+        Recursively format a value for LLM consumption.
+        
+        Args:
+            value: Value to format
+            indent: Current indentation level
+            
+        Returns:
+            str: Formatted string
+        """
+        prefix = "  " * indent
+        
+        if isinstance(value, dict):
+            lines = []
+            for k, v in value.items():
+                # Skip 'success' key as it's redundant
+                if k == 'success':
+                    continue
+                # Format nested dicts
+                if isinstance(v, dict):
+                    lines.append(f"{prefix}{k}:")
+                    lines.append(self._format_value(v, indent + 1))
+                elif isinstance(v, list):
+                    lines.append(f"{prefix}{k}: {len(v)} items")
+                    for i, item in enumerate(v[:5]):  # Limit to 5 items
+                        if isinstance(item, dict):
+                            lines.append(f"{prefix}  - {self._format_value(item, 0)}")
+                        else:
+                            lines.append(f"{prefix}  - {item}")
+                    if len(v) > 5:
+                        lines.append(f"{prefix}  ... and {len(v) - 5} more")
+                else:
+                    # Format key nicely
+                    key_display = k.replace('_', ' ').title()
+                    lines.append(f"{prefix}{key_display}: {v}")
+            return "\n".join(lines)
+        elif isinstance(value, list):
+            return f"{len(value)} items"
+        else:
+            return str(value)

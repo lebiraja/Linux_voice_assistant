@@ -43,6 +43,14 @@ logging:
   file: "logs/lva.log"
   max_bytes: 10485760  # 10MB
   backup_count: 5
+
+# Wake Word Detection
+wake_word:
+  enabled: true
+  model: "hey_jarvis"  # Pre-trained model: hey_jarvis, alexa, hey_mycroft
+  threshold: 0.35      # Detection threshold (0.0-1.0) - lowered for better sensitivity
+  chunk_size: 1280     # Audio chunk size for processing
+  vad_threshold: 0.0   # Voice activity detection threshold
   
 # Paths
 paths:

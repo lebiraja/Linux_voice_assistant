@@ -5,6 +5,7 @@ Built-in tools
 from .filesystem import ListFilesTool, ReadFileTool, SearchFilesTool
 from .system import GetSystemInfoTool, GetProcessesTool, ExecuteCommandTool
 from .web import SearchWebTool, FetchURLTool
+from .apps import OpenAppTool, RunScriptTool, CloseAppTool
 
 __all__ = [
     'ListFilesTool',
@@ -14,5 +15,8 @@ __all__ = [
     'GetProcessesTool',
     'ExecuteCommandTool',
     'SearchWebTool',
-    'FetchURLTool'
+    'FetchURLTool',
+    'OpenAppTool',
+    'RunScriptTool',
+    'CloseAppTool',
 ]

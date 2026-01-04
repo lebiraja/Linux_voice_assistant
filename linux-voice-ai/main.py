@@ -13,7 +13,7 @@ from pynput import keyboard
 
 # Import modules
 from audio import AudioRecorder, AudioPlayer
-from stt import WhisperEngine
+from stt import WhisperEngine, WakeWordManager
 from parser import CommandParser
 from actions import AppController, SystemInfo
 from tts.google_tts import GoogleTTS
@@ -24,7 +24,8 @@ from tools import ToolRegistry, ToolExecutor
 from tools.builtin import (
     ListFilesTool, ReadFileTool, SearchFilesTool,
     GetSystemInfoTool, GetProcessesTool, ExecuteCommandTool,
-    SearchWebTool, FetchURLTool
+    SearchWebTool, FetchURLTool,
+    OpenAppTool, RunScriptTool, CloseAppTool
 )
 
 logger = logging.getLogger(__name__)
@@ -62,6 +63,7 @@ class VoiceAssistant:
         # State
         self.is_recording = False
         self.hotkey_listener = None
+        self.wake_word_active = False
         
         # Initialize UI
         self.ui = SiriUI()
@@ -69,7 +71,13 @@ class VoiceAssistant:
         logger.info("Visual UI initialized")
         
         logger.info("Voice Assistant initialized successfully")
-        logger.info(f"Hotkey: {self.config['hotkey']['combination']}")
+        
+        # Show activation methods
+        hotkey = self.config['hotkey']['combination']
+        wake_config = self.config.get('wake_word', {})
+        logger.info(f"Hotkey: {hotkey}")
+        if wake_config.get('enabled', False) and self.wake_word_manager:
+            logger.info(f"Wake word: Say 'Hey JARVIS' for hands-free activation")
     
     def _load_config(self, config_file):
         """Load configuration from YAML file."""
@@ -153,6 +161,24 @@ class VoiceAssistant:
             lang=tts_config.get('lang', 'en'),
             tld=tts_config.get('tld', 'com')
         )
+        
+        # Wake Word Detection
+        self.wake_word_manager = None
+        wake_config = self.config.get('wake_word', {})
+        if wake_config.get('enabled', False):
+            try:
+                self.wake_word_manager = WakeWordManager(
+                    config=wake_config,
+                    on_wake=self._on_wake_word_detected
+                )
+                if self.wake_word_manager.is_available():
+                    logger.info(f"Wake word detection ready: '{wake_config.get('model', 'hey_jarvis')}'")
+                else:
+                    logger.warning("Wake word not available - install openwakeword")
+                    self.wake_word_manager = None
+            except Exception as e:
+                logger.error(f"Failed to initialize wake word: {e}")
+                self.wake_word_manager = None
     
     def _register_tools(self):
         """Register all built-in tools"""
@@ -167,7 +193,11 @@ class VoiceAssistant:
             ExecuteCommandTool(),
             # Web tools
             SearchWebTool(),
-            FetchURLTool()
+            FetchURLTool(),
+            # App control tools
+            OpenAppTool(),
+            RunScriptTool(),
+            CloseAppTool(),
         ]
         
         for tool in tools:
@@ -294,26 +324,36 @@ class VoiceAssistant:
                     # Execute the tool
                     tool_result = self.tool_executor.execute(tool_name, tool_params)
                     
-                    # Format result
+                    # Format result clearly
                     result_text = self.tool_executor.format_result_for_llm(tool_result)
                     
+                    logger.debug(f"Tool result formatted: {result_text}")
+                    
                     # Get final response from LLM with tool results
-                    final_prompt = f"""Tool '{tool_name}' returned:
+                    final_prompt = f"""I asked: "{text}"
+
+The {tool_name} tool returned this data:
 {result_text}
 
-Based on these results, provide a concise spoken answer to: {text}
-
+Answer my question using the data above. Be specific with numbers.
 Keep it brief (1-2 sentences) since it will be spoken aloud."""
                     
                     final_result = self.llm_client.generate(
                         prompt=final_prompt,
-                        system="You are JARVIS. Provide a concise, natural response based on the tool results.",
-                        temperature=0.7,
-                        max_tokens=150
+                        system="You are JARVIS. Answer using the data provided. Use specific numbers.",
+                        temperature=0.3,  # Lower for accuracy
+                        max_tokens=100
                     )
                     
                     if final_result.get('success'):
-                        return final_result.get('response', 'I processed your request.')
+                        final_response = final_result.get('response', '')
+                        # If LLM still refuses, provide direct answer from data
+                        if any(word in final_response.lower() for word in ['cannot', 'unable', 'sorry', "don't have"]):
+                            return self._generate_direct_answer(tool_name, tool_result, text)
+                        return final_response
+                    else:
+                        # LLM failed, generate direct answer
+                        return self._generate_direct_answer(tool_name, tool_result, text)
             
             # No tools needed or tool execution failed, return direct response
             return response
@@ -323,53 +363,97 @@ Keep it brief (1-2 sentences) since it will be spoken aloud."""
             return "I encountered an error. Please try again."
     
     def _parse_tool_call(self, response: str) -> dict:
-        """
-        Parse tool call from LLM text response.
-        
-        Expected format: TOOL: tool_name(param1="value1", param2="value2")
-        
-        Args:
-            response: LLM response text
-            
-        Returns:
-            dict: {'name': tool_name, 'params': {param: value}} or None
-        """
+        """Parse tool call from LLM text response."""
         import re
         
+        VALID_TOOLS = {
+            'open_app', 'close_app', 'run_script',
+            'get_system_info', 'get_processes', 'list_files',
+            'read_file', 'search_files', 'execute_command',
+            'search_web', 'fetch_url'
+        }
+        
         try:
-            # Find TOOL: pattern
             match = re.search(r'TOOL:\s*([\w_]+)\(([^)]*)\)', response)
-            
             if not match:
                 return None
             
             tool_name = match.group(1)
             params_str = match.group(2)
             
-            # Parse parameters
+            # Validate tool name
+            if tool_name not in VALID_TOOLS:
+                logger.warning(f"Invalid tool: {tool_name}")
+                return None
+            
+            # Parse parameters  
             params = {}
             if params_str.strip():
-                # Simple parameter parsing
-                param_matches = re.findall(r'(\w+)\s*=\s*"([^"]*)"|([\w_]+)\s*=\s*([\w.]+)', params_str)
-                for match in param_matches:
-                    if match[0]:  # String value
-                        params[match[0]] = match[1]
-                    elif match[2]:  # Non-string value
-                        value = match[3]
-                        # Try to convert to appropriate type
-                        if value.isdigit():
-                            params[match[2]] = int(value)
-                        elif value.lower() in ['true', 'false']:
-                            params[match[2]] = value.lower() == 'true'
-                        else:
-                            params[match[2]] = value
+                for m in re.findall(r'(\w+)\s*=\s*"([^"]*)"', params_str):
+                    params[m[0]] = m[1]
+                for m in re.findall(r"(\w+)\s*=\s*'([^']*)'", params_str):
+                    params[m[0]] = m[1]
             
-            logger.info(f"Parsed tool call: {tool_name} with params: {params}")
+            logger.info(f"Parsed: {tool_name} params: {params}")
             return {'name': tool_name, 'params': params}
             
         except Exception as e:
-            logger.error(f"Failed to parse tool call: {e}")
+            logger.error(f"Parse error: {e}")
             return None
+    
+    def _generate_direct_answer(self, tool_name: str, tool_result: dict, question: str) -> str:
+        """
+        Generate a direct answer from tool results when LLM fails.
+        
+        Args:
+            tool_name: Name of the tool that was called
+            tool_result: Raw tool execution result
+            question: Original user question
+            
+        Returns:
+            str: Direct answer based on tool data
+        """
+        if not tool_result.get('success'):
+            return "I encountered an error getting that information."
+        
+        result = tool_result.get('result', {})
+        
+        # Handle different tool results
+        if tool_name == 'get_system_info':
+            parts = []
+            if 'cpu' in result:
+                cpu = result['cpu']
+                parts.append(f"CPU usage is at {cpu.get('usage_percent', 0):.1f}%")
+            if 'memory' in result:
+                mem = result['memory']
+                used_gb = mem.get('used_gb', 0)
+                total_gb = mem.get('total_gb', 0)
+                percent = mem.get('percent', 0)
+                parts.append(f"Memory is {percent:.0f}% used ({used_gb:.1f}GB of {total_gb:.1f}GB)")
+            if 'disk' in result:
+                disk = result['disk']
+                free_gb = disk.get('free_gb', 0)
+                parts.append(f"Disk has {free_gb:.1f}GB free")
+            return ". ".join(parts) if parts else "System information retrieved."
+        
+        elif tool_name == 'list_files':
+            count = result.get('count', 0)
+            path = result.get('path', '.')
+            return f"I found {count} files in {path}."
+        
+        elif tool_name == 'get_processes':
+            processes = result.get('processes', [])
+            return f"There are {len(processes)} active processes running."
+        
+        elif tool_name == 'search_web':
+            results = result.get('results', [])
+            if results:
+                return f"I found {len(results)} results. The top result is: {results[0].get('title', 'Unknown')}"
+            return "No search results found."
+        
+        else:
+            # Generic response
+            return "I retrieved the information you requested."
     
     def _execute_action(self, intent):
         """
@@ -423,6 +507,20 @@ Keep it brief (1-2 sentences) since it will be spoken aloud."""
             finally:
                 self.is_recording = False
     
+    def _on_wake_word_detected(self):
+        """Callback when wake word is detected."""
+        logger.info("Wake word detected - triggering voice command")
+        if not self.is_recording:
+            self.is_recording = True
+            try:
+                # Play acknowledgment sound or speak
+                print("\n🎤 Yes? I'm listening...")
+                self.process_voice_command()
+            except Exception as e:
+                logger.error(f"Error processing wake word command: {e}", exc_info=True)
+            finally:
+                self.is_recording = False
+    
     def start(self):
         """Start the voice assistant."""
         logger.info("Starting voice assistant...")
@@ -436,7 +534,17 @@ Keep it brief (1-2 sentences) since it will be spoken aloud."""
         else:
             print("⚙️  Mode: Rule-based only (LLM unavailable)")
         
+        # Activation methods
         print(f"\nPress {self.config['hotkey']['combination'].upper()} to speak")
+        
+        # Start wake word detection if available
+        if self.wake_word_manager and self.wake_word_manager.is_available():
+            if self.wake_word_manager.start():
+                self.wake_word_active = True
+                wake_model = self.config.get('wake_word', {}).get('model', 'hey_jarvis')
+                print(f"🗣️  Or say 'Hey JARVIS' for hands-free activation")
+                logger.info(f"Wake word listening active: {wake_model}")
+        
         print("Press Ctrl+C to exit\n")
         
         # Parse hotkey combination
@@ -454,6 +562,12 @@ Keep it brief (1-2 sentences) since it will be spoken aloud."""
     def stop(self):
         """Stop the voice assistant."""
         logger.info("Stopping voice assistant...")
+        
+        # Stop wake word detection
+        if self.wake_word_manager:
+            self.wake_word_manager.stop()
+            self.wake_word_active = False
+        
         if self.ui:
             self.ui.stop()
         print("\n👋 Goodbye!")
