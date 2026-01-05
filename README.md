@@ -704,7 +704,6 @@ TOOL: get_system_info(info_type="all")
 **Benefits:**
 - ✅ Simple and reliable
 - ✅ Works with any LLM
-- ✅ Easy to debug
 - ✅ No complex function schemas
 
 ### Tool Development
