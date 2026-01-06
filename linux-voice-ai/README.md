@@ -20,7 +20,7 @@ Linux Voice AI Assistant (JARVIS) is a sophisticated, voice-controlled AI assist
 
 - 🎙️ **Dual Activation Modes**: Hotkey (Ctrl+Space) or hands-free wake word ("Hey JARVIS")
 - 🧠 **Hybrid Intelligence**: Smart routing between fast rule-based parsing and advanced LLM reasoning
-- 🛠️ **10+ Built-in Tools**: Filesystem operations, system monitoring, web access, and application control
+- 🛠️ **20 Built-in Tools**: Filesystem, system control, web access, AI script generation, media control, conversation, and user context
 - 🎨 **Beautiful Visual UI**: Siri-like animated overlay with real-time state feedback
 - 🗣️ **Natural Speech**: High-quality Google TTS for natural-sounding responses
 - 🐳 **Production Ready**: Fully containerized with Docker Compose
@@ -90,7 +90,7 @@ User Command → Is it simple? → Yes → Rule Parser → Execute
 
 ### 🛠️ Comprehensive Tool System
 
-The assistant includes **10 powerful built-in tools** organized into 4 categories:
+The assistant includes **20 powerful built-in tools** organized into 7 categories:
 
 #### 1. 📁 Filesystem Operations
 
@@ -213,6 +213,135 @@ Returns:
 ✓ "run the backup script"
 ✓ "execute my build script"
 ```
+
+#### 5. 🤖 AI Script Generation (NEW!)
+
+**`generate_and_run_script`** - AI-powered script creation and execution
+```
+✓ "write a script to back up my Documents folder"
+✓ "create a Python script to organize my Downloads"
+✓ "generate a script to monitor CPU usage and log it"
+✓ "make a script that converts all PNG to JPG"
+```
+- Uses [aichat](https://github.com/sigoden/aichat) for AI-powered generation
+- Supports: Bash, Python, JavaScript, and more
+- Automatic execution with safety timeouts
+- Detailed error reporting
+- **See [SCRIPT_GENERATION.md](SCRIPT_GENERATION.md) for full documentation**
+
+**`execute_command`** - Direct shell command execution
+```
+✓ "run git status"
+✓ "execute docker ps"
+```
+- Flexible command execution
+- Configurable timeout
+- Capture output and errors
+
+#### 6. 🎵 Media Playback Control (NEW!)
+
+**`control_media`** - Full media player control
+```
+✓ "play music"
+✓ "pause"
+✓ "next song"
+✓ "previous track"
+✓ "volume up"
+✓ "set volume to 50"
+✓ "what's playing?"
+```
+- Play, pause, stop, play-pause toggle
+- Next/previous track navigation
+- Volume control (up, down, set, mute/unmute)
+- Seek forward/backward
+- Get now playing info
+- Works with: Spotify, VLC, browsers, and all MPRIS-compatible players
+- **See [MEDIA_CONTROL.md](MEDIA_CONTROL.md) for full documentation**
+
+**`get_now_playing`** - Get current track information
+```
+✓ "what song is this?"
+✓ "tell me what's playing"
+```
+- Returns: title, artist, album, duration, status
+
+#### 7. 💬 Conversation & Knowledge Sharing (NEW!)
+
+**`answer_question`** - Answer general questions
+```
+✓ "what is Docker?"
+✓ "how does machine learning work?"
+✓ "tell me about REST APIs"
+```
+- General knowledge Q&A
+- Technical explanations
+- Response styles: concise, detailed, casual
+
+**`explain_concept`** - Explain technical concepts
+```
+✓ "explain containerization"
+✓ "explain Kubernetes in simple terms"
+✓ "how does DNS work?"
+```
+- Complexity levels: simple, intermediate, advanced
+- ELI5-style explanations available
+- Technical deep-dives when needed
+
+**`have_conversation`** - Casual chat and greetings
+```
+✓ "hello JARVIS"
+✓ "how are you?"
+✓ "thanks for the help"
+```
+- Natural greetings and small talk
+- Friendly conversation
+- Contextual responses
+
+**Conversation Memory:**
+- Remembers last 10 exchanges
+- Context-aware responses
+- Resolves references ("it", "that", etc.)
+- **See [CONVERSATION.md](CONVERSATION.md) for full documentation**
+
+#### 8. 🧠 User Context & Personalization (NEW!)
+
+**`set_user_preference`** - Remember user preferences
+```
+✓ "I prefer concise responses"
+✓ "Use Firefox as my browser"
+✓ "I like detailed explanations"
+```
+- Response style preferences
+- App preferences
+- Detail level settings
+
+**`remember_user_info`** - Remember personal information
+```
+✓ "My name is Alex"
+✓ "I'm a software developer"
+✓ "My workspace is ~/projects"
+```
+- Name, occupation, location
+- Timezone, interests
+- Persistent across sessions
+
+**`set_work_context`** - Track work context
+```
+✓ "I'm working on a Django project"
+✓ "My primary language is Python"
+✓ "Current project is blog-platform"
+```
+- Current project tracking
+- Programming language preferences
+- Project directory context
+
+**Context Features:**
+- Remembers important user information
+- Learns preferences from conversations
+- Personalizes responses based on context
+- Persists across sessions (saved to JSON)
+- Up to 50 important facts stored
+- **See [USER_CONTEXT.md](USER_CONTEXT.md) for full documentation**
 
 ---
 

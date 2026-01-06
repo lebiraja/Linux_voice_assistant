@@ -1,11 +1,14 @@
 """
 Smart Router
 Routes commands to either rule-based parser or LLM based on complexity
+Supports both tool-calling commands and general conversation
 """
 
 import re
 import logging
-from typing import Tuple, Dict, Any, Optional
+from typing import Tuple, Dict, Any, Optional, List
+from .conversation_memory import ConversationMemory
+from .user_context import UserContext
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +21,8 @@ class SmartRouter:
     1. Try rule-based parser first for speed
     2. If rule parser succeeds with high confidence, use it
     3. Otherwise, route to LLM for complex understanding
-    4. Fallback to rules if LLM fails
+    4. Support conversational mode for general Q&A
+    5. Fallback to rules if LLM fails
     """
     
     def __init__(self, llm_client, rule_parser, config: Dict):
@@ -35,6 +39,15 @@ class SmartRouter:
         self.config = config
         self.logger = logging.getLogger(__name__)
         
+        # Initialize conversation memory
+        self.conversation = ConversationMemory(
+            max_history=config.get('conversation', {}).get('max_history', 10)
+        )
+        
+        # Initialize user context
+        context_file = config.get('conversation', {}).get('context_file', 'user_context.json')
+        self.user_context = UserContext(context_file)
+        
         # Simple command patterns (regex)
         self.simple_patterns = [
             r"^(open|launch|start|run)\s+\w+$",
@@ -45,6 +58,7 @@ class SmartRouter:
         # LLM is enabled by default, can be disabled in config
         self.llm_enabled = config.get('llm', {}).get('enabled', True)
         self.fallback_to_rules = config.get('llm', {}).get('fallback_to_rules', True)
+        self.conversation_mode = config.get('conversation', {}).get('enabled', True)
     
     def route(self, text: str, context: Optional[str] = None) -> Tuple[str, Any]:
         """
@@ -52,7 +66,7 @@ class SmartRouter:
         
         Args:
             text: User command text
-            context: Optional conversation context
+            context: Optional conversation context (if None, uses memory)
             
         Returns:
             Tuple of (processor_type, result)
@@ -154,4 +168,66 @@ class SmartRouter:
         if any(text.lower().startswith(word) for word in question_words):
             return True
         
+        return False    
+    def is_conversational(self, text: str) -> bool:
+        """
+        Check if input is conversational (not a command).
+        
+        Args:
+            text: User input
+            
+        Returns:
+            bool: True if conversational
+        """
+        text_lower = text.lower().strip()
+        
+        # Greetings
+        greetings = ['hello', 'hi', 'hey', 'good morning', 'good afternoon', 
+                     'good evening', "what's up", 'how are you']
+        if any(greeting in text_lower for greeting in greetings):
+            return True
+        
+        # Questions (general knowledge, not system commands)
+        question_starters = [
+            'what is', 'what are', 'what does', "what's",
+            'how does', 'how do', 'how can',
+            'why is', 'why are', 'why does',
+            'when was', 'when is', 'when did',
+            'who is', 'who was', 'who are',
+            'tell me about', 'explain',
+            'can you tell', 'do you know'
+        ]
+        if any(text_lower.startswith(q) for q in question_starters):
+            # Exclude system commands like "what's my CPU usage"
+            system_keywords = ['cpu', 'memory', 'ram', 'disk', 'storage', 'process']
+            if not any(kw in text_lower for kw in system_keywords):
+                return True
+        
+        # Thank you / feedback
+        feedback = ['thank', 'thanks', 'appreciate', 'good job', 'well done',
+                   'nice', 'great', 'awesome', 'perfect']
+        if any(fb in text_lower for fb in feedback):
+            return True
+        
         return False
+    
+    def add_to_memory(self, user_input: str, response: str, metadata: Optional[Dict] = None):
+        """Add exchange to conversation memory"""
+        if self.conversation_mode:
+            self.conversation.add_exchange(user_input, response, metadata)
+    
+    def get_conversation_context(self, num_exchanges: int = 5) -> str:
+        """Get recent conversation context"""
+        return self.conversation.get_context(num_exchanges)
+    
+    def clear_conversation(self):
+        """Clear conversation memory"""
+        self.conversation.clear()
+    
+    def get_user_context_summary(self) -> str:
+        """Get formatted user context for prompts"""
+        return self.user_context.get_context_summary()
+    
+    def update_user_context(self, user_input: str, metadata: Optional[Dict] = None):
+        """Update user context based on interaction"""
+        self.user_context.learn_from_interaction(user_input, metadata)

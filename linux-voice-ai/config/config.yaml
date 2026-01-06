@@ -27,11 +27,27 @@ llm:
   enabled: true
   provider: "ollama"
   base_url: "http://localhost:11434"  # Works with Docker host networking
-  model: "deepseek-r1:1.5b"
-  temperature: 0.6    # Slightly higher for reasoning
-  max_tokens: 1024    # Increased for Chain of Thought output
+  model: "qwen3:4b"  # Excellent tool calling support (already installed)
+  temperature: 0.3    # Low for tool calling accuracy
+  max_tokens: 512     # Sufficient for tool calls
   timeout: 30
   fallback_to_rules: true
+
+# AI Script Generation (aichat)
+aichat:
+  enabled: true
+  model: "ollama:qwen3:4b"  # Same model for consistency
+  timeout: 60  # Script generation timeout in seconds
+  max_script_execution_time: 300  # 5 minutes max for script execution
+  auto_execute: true  # Automatically execute generated scripts (user preference)
+  working_directory: null  # Default to current directory, or specify a path
+
+# Conversation Mode
+conversation:
+  enabled: true
+  max_history: 10  # Number of exchanges to remember
+  context_window: 5  # Number of recent exchanges to include in prompts
+  context_file: "user_context.json"  # File to store user preferences and context
   
 # Hotkey Configuration
 hotkey:

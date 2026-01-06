@@ -182,6 +182,13 @@ class VoiceAssistant:
     
     def _register_tools(self):
         """Register all built-in tools"""
+        from tools.builtin import (
+            GenerateAndRunScriptTool,
+            MediaControlTool, GetNowPlayingTool,
+            AnswerQuestionTool, ExplainConceptTool, HaveConversationTool,
+            SetUserPreferenceTool, RememberUserInfoTool, SetWorkContextTool
+        )
+        
         tools = [
             # Filesystem tools
             ListFilesTool(),
@@ -198,6 +205,19 @@ class VoiceAssistant:
             OpenAppTool(),
             RunScriptTool(),
             CloseAppTool(),
+            # AI Script Generation
+            GenerateAndRunScriptTool(),
+            # Media Control
+            MediaControlTool(),
+            GetNowPlayingTool(),
+            # Conversation & Knowledge
+            AnswerQuestionTool(),
+            ExplainConceptTool(),
+            HaveConversationTool(),
+            # User Context
+            SetUserPreferenceTool(),
+            RememberUserInfoTool(),
+            SetWorkContextTool(),
         ]
         
         for tool in tools:
@@ -342,20 +362,39 @@ class VoiceAssistant:
                     combined_results = "\n\n".join(full_result_text)
                     logger.debug(f"Combined tool results: {combined_results}")
                     
+                    # Determine response style based on tool types
+                    conversation_tools = {'answer_question', 'explain_concept', 'have_conversation'}
+                    is_conversation = any(call['name'] in conversation_tools for call in tool_calls)
+                    
                     # Get final response from LLM with tool results
-                    final_prompt = f"""I asked: "{text}"
+                    if is_conversation:
+                        # Detailed response for questions/conversation
+                        final_prompt = f"""User asked: "{text}"
 
-Here are the results from the tools you requested:
+Tool results:
 {combined_results}
 
-Answer my question / confirm completion using the data above.
-Keep it brief (1-2 sentences) since it will be spoken aloud."""
+Provide a natural, informative response using the above information. Be conversational and helpful."""
+                        temperature = 0.7
+                        max_tokens = 300
+                        system_msg = "You are JARVIS, a helpful AI assistant. Provide informative, natural responses."
+                    else:
+                        # Concise response for commands/actions
+                        final_prompt = f"""I asked: "{text}"
+
+Results:
+{combined_results}
+
+Confirm what was done in 1-2 sentences (will be spoken aloud)."""
+                        temperature = 0.3
+                        max_tokens = 100
+                        system_msg = "You are JARVIS. Confirm actions briefly using the provided data."
                     
                     final_result = self.llm_client.generate(
                         prompt=final_prompt,
-                        system="You are JARVIS. Confirm actions or answer using the provided data.",
-                        temperature=0.3,
-                        max_tokens=150
+                        system=system_msg,
+                        temperature=temperature,
+                        max_tokens=max_tokens
                     )
                     
                     if final_result.get('success'):
@@ -426,10 +465,22 @@ Keep it brief (1-2 sentences) since it will be spoken aloud."""
         import re
         
         VALID_TOOLS = {
+            # App control
             'open_app', 'close_app', 'run_script',
-            'get_system_info', 'get_processes', 'list_files',
-            'read_file', 'search_files', 'execute_command',
-            'search_web', 'fetch_url'
+            # System
+            'get_system_info', 'get_processes', 'execute_command',
+            # Filesystem
+            'list_files', 'read_file', 'search_files',
+            # Web
+            'search_web', 'fetch_url',
+            # Script generation
+            'generate_and_run_script',
+            # Media control
+            'control_media', 'get_now_playing',
+            # Conversation
+            'answer_question', 'explain_concept', 'have_conversation',
+            # User context
+            'set_user_preference', 'remember_user_info', 'set_work_context',
         }
         
         tool_calls = []
