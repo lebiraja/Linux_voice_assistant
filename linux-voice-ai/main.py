@@ -186,7 +186,9 @@ class VoiceAssistant:
             GenerateAndRunScriptTool,
             MediaControlTool, GetNowPlayingTool,
             AnswerQuestionTool, ExplainConceptTool, HaveConversationTool,
-            SetUserPreferenceTool, RememberUserInfoTool, SetWorkContextTool
+            SetUserPreferenceTool, RememberUserInfoTool, SetWorkContextTool,
+            BrightnessControlTool, PowerManagementTool, SystemVolumeTool,
+            OpenWebsiteTool, WebSearchTool
         )
         
         tools = [
@@ -218,6 +220,13 @@ class VoiceAssistant:
             SetUserPreferenceTool(),
             RememberUserInfoTool(),
             SetWorkContextTool(),
+            # System Control (New)
+            BrightnessControlTool(),
+            PowerManagementTool(),
+            SystemVolumeTool(),
+            # Web Navigation (New)
+            OpenWebsiteTool(),
+            WebSearchTool(),
         ]
         
         for tool in tools:
@@ -304,36 +313,39 @@ class VoiceAssistant:
         Args:
             text: User command
             context: Optional conversation context
-            
-        Returns:
-            str: Response text
         """
         try:
-            # Get system prompt with tools
+            # Build system prompt with tool calling instructions
             tool_schemas = self.tool_registry.get_all_schemas() if self.tool_executor else []
-            system_prompt = SystemPrompts.get_system_prompt(
-                include_tools=len(tool_schemas) > 0,
-                tools=tool_schemas
-            )
+            system_prompt = f"""{SystemPrompts.ASSISTANT_SYSTEM_PROMPT}
+
+{SystemPrompts.TOOL_CALLING_PROMPT}"""
             
-            # First LLM call - ask if it needs tools
+            # Generate LLM response
+            logger.info("LLM requested tool usage (text-based)")
             result = self.llm_client.generate(
                 prompt=text,
                 system=system_prompt,
-                temperature=self.config.get('llm', {}).get('temperature', 0.7),
-                max_tokens=self.config.get('llm', {}).get('max_tokens', 512)
+                temperature=0.3,
+                max_tokens=256  # Reduced for faster tool calls
             )
             
+            # Handle errors
             if not result.get('success'):
-                logger.error(f"LLM error: {result.get('message')}")
-                # Fallback to rule-based
-                intent = self.parser.parse(text)
-                if intent and intent['intent'] != 'unknown':
-                    exec_result = self._execute_action(intent)
-                    return generate_response(exec_result, self.parser)
-                return "I'm having trouble understanding that. Could you rephrase?"
+                error_type = result.get('error', 'unknown')
+                logger.error(f"LLM error: {result.get('message', 'Unknown error')}")
+                
+                if error_type == 'timeout':
+                    return "I'm thinking too slowly. Let me try the quick route."
+                else:
+                    return "I encountered an error. Please try again."
             
-            response = result.get('response', '')
+            response = result.get('response', '').strip()
+            
+            # Handle empty response
+            if not response:
+                logger.warning("LLM returned empty response")
+                return "I didn't quite catch that. Could you rephrase?"
             
             # Check if LLM wants to use tools (text-based format)
             if 'TOOL:' in response and self.tool_executor:
@@ -481,6 +493,10 @@ Confirm what was done in 1-2 sentences (will be spoken aloud)."""
             'answer_question', 'explain_concept', 'have_conversation',
             # User context
             'set_user_preference', 'remember_user_info', 'set_work_context',
+            # System Control
+            'control_brightness', 'power_management', 'control_system_volume',
+            # Web Navigation
+            'open_website', 'web_search',
         }
         
         tool_calls = []
@@ -500,13 +516,29 @@ Confirm what was done in 1-2 sentences (will be spoken aloud)."""
                     logger.warning(f"Invalid tool skipped: {tool_name}")
                     continue
                 
-                # Parse parameters  
+                # Parse parameters - handle quoted strings, numbers, booleans
                 params = {}
                 if params_str.strip():
+                    # Try quoted strings first (double quotes)
                     for m in re.findall(r'(\w+)\s*=\s*"([^"]*)"', params_str):
                         params[m[0]] = m[1]
+                    # Single quotes
                     for m in re.findall(r"(\w+)\s*=\s*'([^']*)'", params_str):
-                        params[m[0]] = m[1]
+                        if m[0] not in params:  # Don't override
+                            params[m[0]] = m[1]
+                    # Unquoted values (numbers, booleans, etc.)
+                    for m in re.findall(r'(\w+)\s*=\s*([^,\s)]+)', params_str):
+                        if m[0] not in params:  # Don't override quoted values
+                            value = m[1].strip()
+                            # Convert types
+                            if value.lower() == 'true':
+                                params[m[0]] = True
+                            elif value.lower() == 'false':
+                                params[m[0]] = False
+                            elif value.isdigit():
+                                params[m[0]] = int(value)
+                            else:
+                                params[m[0]] = value
                 
                 logger.info(f"Parsed: {tool_name} params: {params}")
                 tool_calls.append({'name': tool_name, 'params': params})

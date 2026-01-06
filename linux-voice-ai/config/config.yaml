@@ -30,7 +30,7 @@ llm:
   model: "qwen3:4b"  # Excellent tool calling support (already installed)
   temperature: 0.3    # Low for tool calling accuracy
   max_tokens: 512     # Sufficient for tool calls
-  timeout: 30
+  timeout: 60         # Increased for CPU inference reliability
   fallback_to_rules: true
 
 # AI Script Generation (aichat)

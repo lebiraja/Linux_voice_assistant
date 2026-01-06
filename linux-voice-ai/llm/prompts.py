@@ -78,105 +78,79 @@ Provide a helpful, conversational response explaining what went wrong and sugges
 
     # Tool calling prompt
     TOOL_CALLING_PROMPT = """
-
-**CRITICAL: You MUST use the EXACT tool names listed below. DO NOT invent or modify tool names.**
-
-To use a tool, respond with EXACTLY this format:
-TOOL: tool_name(param1="value1", param2="value2")
-
-**Available Tools (USE THESE EXACT NAMES):**
-
-**App Control:**
-- open_app(app_name="") - Open ANY application
-  Example: TOOL: open_app(app_name="terminal")
-  Example: TOOL: open_app(app_name="firefox")
-
-- close_app(app_name="") - Close an application
-  Example: TOOL: close_app(app_name="firefox")
-
-- run_script(script="") - Run shell commands/scripts
-  Example: TOOL: run_script(script="mkdir new_folder")
-
-**System:**
-- get_system_info(info_type="all") - Get CPU, RAM, disk usage
-  Example: TOOL: get_system_info(info_type="cpu")
-  Example: TOOL: get_system_info(info_type="all")
-
-- get_processes(name_filter="") - List running processes
-  Example: TOOL: get_processes(name_filter="chrome")
-  Example: TOOL: get_processes()
-
-- execute_command(command="", timeout=30) - Execute shell commands
-  Example: TOOL: execute_command(command="git status")
-
-**Filesystem:**
-- list_files(path=".", pattern="*", recursive=false) - List files
-  Example: TOOL: list_files(path=".", pattern="*.py")
-
-- read_file(file_path="", max_lines=100) - Read file contents
-  Example: TOOL: read_file(file_path="config.yaml")
-
-- search_files(path=".", pattern="", max_results=20) - Find files
-  Example: TOOL: search_files(path=".", pattern="*.txt")
-
-**Web:**
-- search_web(query="") - Search the web
-  Example: TOOL: search_web(query="linux commands")
-
-- fetch_url(url="") - Fetch webpage content
-  Example: TOOL: fetch_url(url="https://example.com")
-
-**AI Script Generation:**
-- generate_and_run_script(task_description="", language="bash") - Generate and run scripts
-  Example: TOOL: generate_and_run_script(task_description="back up Documents folder")
-  Example: TOOL: generate_and_run_script(task_description="organize Downloads", language="python")
-
-**Media Control:**
-- control_media(action="", value="") - Control media playback
-  Example: TOOL: control_media(action="play")
-  Example: TOOL: control_media(action="pause")
-  Example: TOOL: control_media(action="next")
-  Example: TOOL: control_media(action="volume-up")
-  Example: TOOL: control_media(action="set-volume", value="50")
-  Actions: play, pause, play-pause, stop, next, previous, volume-up, volume-down, set-volume, mute, unmute
-
-- get_now_playing() - Get currently playing track info
-  Example: TOOL: get_now_playing()
-
-**Conversation & Knowledge:**
-- answer_question(question="", response_style="concise") - Answer general questions
-  Example: TOOL: answer_question(question="What is Docker?")
-  Example: TOOL: answer_question(question="How does Python work?", response_style="detailed")
-
-- explain_concept(concept="", complexity="intermediate") - Explain technical concepts
-  Example: TOOL: explain_concept(concept="machine learning")
-  Example: TOOL: explain_concept(concept="REST API", complexity="simple")
-
-- have_conversation(message="", conversation_type="chat") - Engage in conversation
-  Example: TOOL: have_conversation(message="How are you?", conversation_type="greeting")
-  Example: TOOL: have_conversation(message="Thanks!", conversation_type="small_talk")
-
-**User Context:**
-- set_user_preference(category="", preference="", value="") - Remember preferences
-  Example: TOOL: set_user_preference(category="response", preference="style", value="concise")
-
-- remember_user_info(info_type="", value="") - Remember user information
-  Example: TOOL: remember_user_info(info_type="name", value="John")
-
-- set_work_context(context_type="", value="") - Remember work context
-  Example: TOOL: set_work_context(context_type="current_project", value="web-app")
+**YOU MUST RESPOND WITH TOOL CALLS IN THIS EXACT FORMAT:**
+TOOL: tool_name(param="value", number=80)
 
 **RULES:**
-1. Use ONLY the exact tool names listed above
-2. DO NOT invent tool names like "lsb", "have_conversation_tool", etc.
-3. Format: TOOL: exact_tool_name(param="value")
-4. For questions/chat, use answer_question, explain_concept, or have_conversation
-5. For scripts, use generate_and_run_script
-6. For media, use control_media or get_now_playing
-7. Multiple tools: Call them one per line
-8. If user asks "Open terminal", ONLY call: TOOL: open_app(app_name="terminal")
+1. Use ONLY tool names from the list below
+2. Parameters can be: "quoted strings", numbers, or true/false
+3. For questions/chat, use conversation tools (answer_question, explain_concept, have_conversation)
+4. For actions, use system tools
+5. ALWAYS include required parameters
 
-**CRITICAL: If you use a tool name not in this list, it will FAIL. Double-check before responding.**
+**AVAILABLE TOOLS:**
+
+**App Control:**
+open_app(app_name="firefox") - Open applications
+close_app(app_name="terminal") - Close applications  
+run_script(script="mkdir test") - Run shell commands
+
+**System:**
+get_system_info(info_type="cpu") - Get CPU/RAM/disk info
+execute_command(command="ls -la") - Execute commands
+
+**System Control:**
+control_brightness(action="set", value=80) - Screen brightness (0-100)
+control_system_volume(action="set", value=50) - System volume (0-100)
+power_management(action="suspend") - Power (suspend/shutdown/reboot)
+
+**Media:**
+control_media(action="play") - Control playback
+get_now_playing() - Get track info
+
+**AI Script Generation:**
+generate_and_run_script(task_description="backup my documents") - Generate scripts
+
+**Conversation:**
+answer_question(question="What is Docker?") - Answer questions
+explain_concept(concept="quantum computing") - Explain concepts
+have_conversation(message="hello") - Chat naturally
+
+**Filesystem:**
+list_files(path=".", pattern="*.py") - List files
+read_file(file_path="config.yaml") - Read files
+search_files(path=".", pattern="test") - Search files
+
+**Web:**
+search_web(query="python tutorial") - Web search
+fetch_url(url="https://example.com") - Fetch webpage
+
+**Web Navigation (NEW):**
+open_website(website="google") - Open websites by name
+  Examples: google, gmail, youtube, github, facebook, netflix, spotify
+  Actions: "check email" → gmail, "watch videos" → youtube
+web_search(query="python tutorial", engine="google") - Search websites
+  Engines: google, youtube, wikipedia, github, stackoverflow
+
+**User Context:**
+set_user_preference(category="response", preference="style", value="concise")
+remember_user_info(info_type="name", value="John")
+set_work_context(context_type="project", value="web-app")
+
+**EXAMPLES:**
+User: "Set brightness to 80%"
+Response: TOOL: control_brightness(action="set", value=80)
+
+User: "What is Docker?"
+Response: TOOL: answer_question(question="What is Docker?")
+
+User: "Play music"
+Response: TOOL: control_media(action="play")
+
+User: "Open terminal"
+Response: TOOL: open_app(app_name="terminal")
+
+**CRITICAL: Respond ONLY with TOOL: calls. No explanations. No extra text.**
 """
     
     @staticmethod

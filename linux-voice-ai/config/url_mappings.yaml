@@ -1,0 +1,83 @@
+# URL Mappings for Smart Website Opening
+# Usage: "open google" → opens google.com
+
+websites:
+  # Search & Email
+  google: "https://www.google.com"
+  gmail: "https://mail.google.com"
+  
+  # Social Media
+  youtube: "https://www.youtube.com"
+  facebook: "https://www.facebook.com"
+  twitter: "https://twitter.com"
+  x: "https://twitter.com"  # Alias for Twitter
+  instagram: "https://www.instagram.com"
+  linkedin: "https://www.linkedin.com"
+  reddit: "https://www.reddit.com"
+  
+  # Development
+  github: "https://github.com"
+  gitlab: "https://gitlab.com"
+  stackoverflow: "https://stackoverflow.com"
+  stackexchange: "https://stackexchange.com"
+  
+  # Google Services
+  drive: "https://drive.google.com"
+  docs: "https://docs.google.com"
+  sheets: "https://sheets.google.com"
+  slides: "https://slides.google.com"
+  calendar: "https://calendar.google.com"
+  maps: "https://maps.google.com"
+  photos: "https://photos.google.com"
+  
+  # Entertainment
+  netflix: "https://www.netflix.com"
+  spotify: "https://open.spotify.com"
+  twitch: "https://www.twitch.tv"
+  amazon: "https://www.amazon.com"
+  
+  # News & Information
+  news: "https://news.google.com"
+  weather: "https://weather.com"
+  wikipedia: "https://www.wikipedia.org"
+  
+  # Productivity
+  notion: "https://www.notion.so"
+  trello: "https://trello.com"
+  slack: "https://slack.com"
+  discord: "https://discord.com"
+  zoom: "https://zoom.us"
+  
+  # Learning
+  coursera: "https://www.coursera.org"
+  udemy: "https://www.udemy.com"
+  khan: "https://www.khanacademy.org"
+  
+  # Other
+  chatgpt: "https://chat.openai.com"
+  claude: "https://claude.ai"
+  gemini: "https://gemini.google.com"
+
+# Search engine templates
+# {query} will be replaced with the search term
+search_engines:
+  google: "https://www.google.com/search?q={query}"
+  youtube: "https://www.youtube.com/results?search_query={query}"
+  wikipedia: "https://en.wikipedia.org/wiki/Special:Search?search={query}"
+  github: "https://github.com/search?q={query}"
+  stackoverflow: "https://stackoverflow.com/search?q={query}"
+  reddit: "https://www.reddit.com/search/?q={query}"
+  amazon: "https://www.amazon.com/s?k={query}"
+  maps: "https://www.google.com/maps/search/{query}"
+
+# Action shortcuts - map common phrases to URLs
+actions:
+  "check email": "gmail"
+  "check mail": "gmail"
+  "watch videos": "youtube"
+  "social media": "facebook"
+  "check weather": "weather"
+  "read news": "news"
+  "check calendar": "calendar"
+  "open drive": "drive"
+  "open chat": "chatgpt"
