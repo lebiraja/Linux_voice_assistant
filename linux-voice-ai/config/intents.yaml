@@ -1,0 +1,393 @@
+# JARVIS Intent Definitions
+# Declarative intent configuration for voice commands
+
+intents:
+  # ========== APP CONTROL ==========
+  - name: open_application
+    description: Launch an application
+    category: app_control
+    tool: open_app
+    triggers:
+      - open
+      - launch
+      - start
+      - run
+    parameters:
+      - name: app_name
+        type: string
+        description: Name of the application to open
+        required: true
+        examples: ["firefox", "terminal", "vscode", "spotify"]
+    examples:
+      - input: "open firefox"
+        output: 'TOOL: open_app(app_name="firefox")'
+      - input: "launch terminal"
+        output: 'TOOL: open_app(app_name="terminal")'
+      - input: "start vscode"
+        output: 'TOOL: open_app(app_name="vscode")'
+
+  - name: close_application
+    description: Close a running application
+    category: app_control
+    tool: close_app
+    triggers:
+      - close
+      - quit
+      - exit
+      - kill
+      - stop
+    parameters:
+      - name: app_name
+        type: string
+        description: Name of the application to close
+        required: true
+        examples: ["firefox", "chrome", "spotify"]
+      - name: force
+        type: boolean
+        description: Force kill if graceful close fails
+        required: false
+        default: false
+    examples:
+      - input: "close firefox"
+        output: 'TOOL: close_app(app_name="firefox")'
+      - input: "kill chrome"
+        output: 'TOOL: close_app(app_name="chrome", force=true)'
+
+  # ========== SYSTEM INFO ==========
+  - name: get_cpu_usage
+    description: Get CPU usage percentage
+    category: system_info
+    tool: get_system_info
+    triggers:
+      - cpu
+      - processor
+      - cpu usage
+    parameters:
+      - name: info_type
+        type: enum
+        description: Type of system info
+        required: true
+        default: cpu
+        enum: [cpu, memory, disk, all]
+    examples:
+      - input: "what's my CPU usage"
+        output: 'TOOL: get_system_info(info_type="cpu")'
+      - input: "show CPU"
+        output: 'TOOL: get_system_info(info_type="cpu")'
+
+  - name: get_memory_usage
+    description: Get RAM/memory usage
+    category: system_info
+    tool: get_system_info
+    triggers:
+      - ram
+      - memory
+      - memory usage
+    parameters:
+      - name: info_type
+        type: enum
+        description: Type of system info
+        required: true
+        default: memory
+        enum: [cpu, memory, disk, all]
+    examples:
+      - input: "how much RAM"
+        output: 'TOOL: get_system_info(info_type="memory")'
+
+  - name: get_disk_usage
+    description: Get disk space information
+    category: system_info
+    tool: get_system_info
+    triggers:
+      - disk
+      - storage
+      - disk space
+      - free space
+    parameters:
+      - name: info_type
+        type: enum
+        description: Type of system info
+        required: true
+        default: disk
+        enum: [cpu, memory, disk, all]
+    examples:
+      - input: "how much disk space"
+        output: 'TOOL: get_system_info(info_type="disk")'
+
+  # ========== SYSTEM CONTROL ==========
+  - name: set_brightness
+    description: Control screen brightness
+    category: system_control
+    tool: control_brightness
+    triggers:
+      - brightness
+      - screen brightness
+      - dim
+      - bright
+    parameters:
+      - name: action
+        type: enum
+        description: Brightness action
+        required: true
+        enum: [get, set, increase, decrease]
+      - name: value
+        type: integer
+        description: Brightness level 0-100
+        required: false
+    examples:
+      - input: "set brightness to 80"
+        output: 'TOOL: control_brightness(action="set", value=80)'
+      - input: "dim the screen"
+        output: 'TOOL: control_brightness(action="decrease")'
+
+  - name: set_volume
+    description: Control system volume
+    category: system_control
+    tool: control_system_volume
+    triggers:
+      - volume
+      - sound
+      - audio
+      - speaker
+      - mute
+    parameters:
+      - name: action
+        type: enum
+        description: Volume action
+        required: true
+        enum: [get, set, increase, decrease, mute, unmute]
+      - name: value
+        type: integer
+        description: Volume level 0-100
+        required: false
+    examples:
+      - input: "set volume to 50"
+        output: 'TOOL: control_system_volume(action="set", value=50)'
+      - input: "mute"
+        output: 'TOOL: control_system_volume(action="mute")'
+
+  - name: power_action
+    description: System power management
+    category: system_control
+    tool: power_management
+    triggers:
+      - shutdown
+      - restart
+      - reboot
+      - suspend
+      - sleep
+      - lock
+    parameters:
+      - name: action
+        type: enum
+        description: Power action
+        required: true
+        enum: [shutdown, reboot, suspend, lock]
+    examples:
+      - input: "lock the screen"
+        output: 'TOOL: power_management(action="lock")'
+      - input: "put computer to sleep"
+        output: 'TOOL: power_management(action="suspend")'
+
+  # ========== MEDIA CONTROL ==========
+  - name: media_playback
+    description: Control media playback
+    category: media
+    tool: control_media
+    triggers:
+      - play
+      - pause
+      - stop
+      - next
+      - previous
+      - skip
+    parameters:
+      - name: action
+        type: enum
+        description: Playback action
+        required: true
+        enum: [play, pause, play-pause, stop, next, previous]
+    requires:
+      - playerctl
+    examples:
+      - input: "play music"
+        output: 'TOOL: control_media(action="play")'
+      - input: "next song"
+        output: 'TOOL: control_media(action="next")'
+
+  - name: now_playing
+    description: Get current track information
+    category: media
+    tool: get_now_playing
+    triggers:
+      - what's playing
+      - current song
+      - now playing
+      - what song
+    requires:
+      - playerctl
+    examples:
+      - input: "what's playing"
+        output: 'TOOL: get_now_playing()'
+
+  # ========== WEB ==========
+  - name: web_search
+    description: Search the web
+    category: web
+    tool: search_web
+    triggers:
+      - search
+      - google
+      - look up
+      - find online
+    parameters:
+      - name: query
+        type: string
+        description: Search query
+        required: true
+    examples:
+      - input: "search for python tutorials"
+        output: 'TOOL: search_web(query="python tutorials")'
+
+  - name: open_website
+    description: Open a website
+    category: web
+    tool: open_website
+    triggers:
+      - open
+      - go to
+      - visit
+      - browse
+      - check
+    parameters:
+      - name: website
+        type: string
+        description: Website name or URL
+        required: true
+        examples: [google, github, youtube, gmail]
+    examples:
+      - input: "open youtube"
+        output: 'TOOL: open_website(website="youtube")'
+      - input: "check my email"
+        output: 'TOOL: open_website(website="gmail")'
+
+  # ========== FILES ==========
+  - name: list_files
+    description: List files in a directory
+    category: files
+    tool: list_files
+    triggers:
+      - list files
+      - show files
+      - what files
+      - ls
+    parameters:
+      - name: path
+        type: string
+        required: false
+        default: "."
+      - name: pattern
+        type: string
+        required: false
+    examples:
+      - input: "list python files"
+        output: 'TOOL: list_files(pattern="*.py")'
+
+  - name: read_file
+    description: Read file contents
+    category: files
+    tool: read_file
+    triggers:
+      - read
+      - show
+      - cat
+      - contents of
+    parameters:
+      - name: file_path
+        type: string
+        required: true
+    examples:
+      - input: "read config.yaml"
+        output: 'TOOL: read_file(file_path="config.yaml")'
+
+  # ========== CONVERSATION ==========
+  - name: answer_question
+    description: Answer a general question
+    category: conversation
+    tool: answer_question
+    triggers:
+      - what is
+      - what are
+      - how does
+      - explain
+      - tell me about
+    parameters:
+      - name: question
+        type: string
+        required: true
+    examples:
+      - input: "what is Docker"
+        output: 'TOOL: answer_question(question="What is Docker?")'
+
+  - name: casual_chat
+    description: Casual conversation
+    category: conversation
+    tool: have_conversation
+    triggers:
+      - hello
+      - hi
+      - hey
+      - good morning
+      - thanks
+      - how are you
+    parameters:
+      - name: message
+        type: string
+        required: true
+    examples:
+      - input: "hello"
+        output: 'TOOL: have_conversation(message="hello")'
+
+  # ========== AUTOMATION ==========
+  - name: generate_script
+    description: Generate and run a custom script
+    category: automation
+    tool: generate_and_run_script
+    triggers:
+      - create script
+      - write script
+      - generate script
+      - automate
+      - script for
+    parameters:
+      - name: task_description
+        type: string
+        required: true
+      - name: language
+        type: enum
+        required: false
+        default: bash
+        enum: [bash, python, javascript]
+      - name: auto_execute
+        type: boolean
+        required: false
+        default: true
+    examples:
+      - input: "create a script to backup my documents"
+        output: 'TOOL: generate_and_run_script(task_description="backup my documents")'
+
+  - name: run_command
+    description: Execute a shell command
+    category: automation
+    tool: run_script
+    triggers:
+      - run
+      - execute
+      - command
+    parameters:
+      - name: script
+        type: string
+        required: true
+    examples:
+      - input: "run git status"
+        output: 'TOOL: run_script(script="git status")'
